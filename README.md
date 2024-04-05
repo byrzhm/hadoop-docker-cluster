@@ -86,7 +86,7 @@ docker run -d -h master --name=master -p 9870:9870 --network hadoop-network hado
 <a name='5-3'></a>
 ### 5.3 - 使用 docker-compose
 
-更加现代的方法是使用 `docker-compose`，你可以在仓库中看到`docker-compose.yaml`配置文件，创建集群只需要在命令行中使用`docker-compose up -d` 即可
+更加现代的方法是使用 `docker-compose`，你可以在仓库中看到[ `docker-compose.yaml` ](./docker-compose.yaml)配置文件，创建集群只需要在命令行中使用`docker-compose up -d` 即可
 
 <!-- vscode-docker 插件演示 -->
 <img src="https://github.com/microsoft/vscode-docker/raw/HEAD/resources/readme/tab-completions.gif" alt="Docker Compose IntelliSense">
