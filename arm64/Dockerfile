@@ -1,5 +1,5 @@
 # @Author: Chen Mingshuo & Hongming Zhu
-# @Date: 2024/05/05
+# @Date: 2024/05/20
 
 FROM ubuntu:22.04
 
@@ -11,7 +11,7 @@ RUN sed -i "s@http://.*.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /etc/a
 
 # 安装JDK等
 RUN apt-get update && \
-    apt-get install -y openjdk-8-jdk wget vim openssh-server net-tools
+    apt-get install -y openjdk-8-jdk wget vim openssh-server net-tools mysql-server
 
 # 配置SSH免密码登录
 RUN ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa && \
@@ -38,6 +38,13 @@ RUN tar -xzvf hbase-2.5.8-bin.tar.gz && \
     mv hbase-2.5.8 hbase && \
     chmod -R 777 hbase
 
+# 下载并解压 Spark
+RUN wget https://mirrors.tuna.tsinghua.edu.cn/apache/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3-scala2.13.tgz
+RUN tar -xzvf spark-3.5.1-bin-hadoop3-scala2.13.tgz && \
+    rm spark-3.5.1-bin-hadoop3-scala2.13.tgz && \
+    mv spark-3.5.1-bin-hadoop3-scala2.13 spark && \
+    chmod -R 777 spark
+    
 RUN echo "slave1" > /root/hadoop/etc/hadoop/workers
 RUN echo "slave2" >> /root/hadoop/etc/hadoop/workers
 RUN echo "slave3" >> /root/hadoop/etc/hadoop/workers
@@ -72,6 +79,12 @@ ENV PATH=$ZOOKEEPER_HOME/bin:$PATH
 ENV HBASE_HOME=/root/hbase
 ENV PATH=$HBASE_HOME/bin:$HBASE_HOME/sbin:$PATH
 
+# Spark
+ENV SPARK_HOME=/root/spark 
+ENV PATH=$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH 
+ENV HADOOP_CONF_DIR=/root/hadoop/etc/hadoop 
+ENV YARN_CONF_DIR=/root/hadoop/etc/hadoop 
+
 # 配置Hadoop
 COPY hadoop_config/* /root/hadoop/etc/hadoop/
 RUN sed -i '1i export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-arm64' /root/hadoop/etc/hadoop/hadoop-env.sh
@@ -88,11 +101,26 @@ RUN echo "export HBASE_MANAGES_ZK=false" >> /root/hbase/conf/hbase-env.sh
 RUN echo "export HBASE_LIBRARY_PATH=/root/hadoop/lib/native" >> /root/hbase/conf/hbase-env.sh
 RUN echo 'export HBASE_DISABLE_HADOOP_CLASSPATH_LOOKUP="true"' >> /root/hbase/conf/hbase-env.sh
 
+# 配置Spark
+RUN mv /root/spark/conf/spark-env.sh.template /root/spark/conf/spark-env.sh
+RUN echo "export SPARK_DIST_CLASSPATH=$(/root/hadoop/bin/hadoop classpath)" >> /root/spark/conf/spark-env.sh
+RUN mv /root/spark/conf/workers.template /root/spark/conf/workers
+RUN echo "master" > /root/spark/conf/workers
+RUN echo "slave1" >> /root/spark/conf/workers
+RUN echo "slave2" >> /root/spark/conf/workers
+RUN echo "slave3" >> /root/spark/conf/workers
+
 # 配置SSH
 RUN echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config
 RUN echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
 RUN echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
 RUN echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
+
+# 下载并解压 MySQL JDBC
+RUN wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-8.0.24.tar.gz
+RUN tar -xzvf mysql-connector-java-8.0.24.tar.gz && \
+    rm mysql-connector-java-8.0.24.tar.gz && \
+    mv mysql-connector-java-8.0.24/mysql-connector-java-8.0.24.jar /root/spark/jars/
 
 # 启动SSH服务
 CMD ["bash", "-c", "service ssh restart; bash"]

@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   master:
     image: hadoop
@@ -11,11 +9,16 @@ services:
       - "9868:9868" # Secondary NameNode Web UI
     command: bash -c "
               service ssh restart && 
+              service mysql start &&
               hdfs namenode -format &&
-              start-all.sh &&
+              start-dfs.sh &&
+              start-yarn.sh &&
               echo 1 > /root/zookeeper/tmp/myid &&
               zkServer.sh start &&
               start-hbase.sh &&
+              spark-config.sh &&
+              start-master.sh &&
+              start-workers.sh &&
               tail -f /dev/null"
     networks:
       - hadoop-network
