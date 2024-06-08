@@ -1,2 +1,6 @@
 # macOS
 .DS_Store
+
+# flink-1.14.6-bin-scala_2.12.tgz
+# kafka_2.12-3.7.0.tgz
+*.tgz

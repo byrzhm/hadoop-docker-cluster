@@ -4,21 +4,11 @@ services:
     container_name: master
     hostname: master # TODO: Change this to name-SID-1
     ports:
-      - "8020:8020" # fs.defaultFS
-      - "9870:9870" # NameNode Web UI
-      - "9868:9868" # Secondary NameNode Web UI
+      - "8081:8081" # Flink Web UI
+      - "8088:8088" # Yarn Web UI
+
     command: bash -c "
               service ssh restart && 
-              service mysql start &&
-              hdfs namenode -format &&
-              start-dfs.sh &&
-              start-yarn.sh &&
-              echo 1 > /root/zookeeper/tmp/myid &&
-              zkServer.sh start &&
-              start-hbase.sh &&
-              spark-config.sh &&
-              start-master.sh &&
-              start-workers.sh &&
               tail -f /dev/null"
     networks:
       - hadoop-network
@@ -33,8 +23,6 @@ services:
     hostname: slave1 # TODO: Change this to name-SID-2
     command: bash -c "
               service ssh restart && 
-              echo 2 > /root/zookeeper/tmp/myid &&
-              zkServer.sh start &&
               tail -f /dev/null"
     networks:
       - hadoop-network
@@ -45,8 +33,6 @@ services:
     hostname: slave2 # TODO: Change this to name-SID-3
     command: bash -c "
               service ssh restart && 
-              echo 3 > /root/zookeeper/tmp/myid &&
-              zkServer.sh start &&
               tail -f /dev/null"
     networks:
       - hadoop-network
@@ -57,8 +43,6 @@ services:
     hostname: slave3 # TODO: Change this to name-SID-4
     command: bash -c "
               service ssh restart && 
-              echo 4 > /root/zookeeper/tmp/myid &&
-              zkServer.sh start &&
               tail -f /dev/null"
     networks:
       - hadoop-network

@@ -1,5 +1,5 @@
 # @Author: Chen Mingshuo & Hongming Zhu
-# @Date: 2024/05/20
+# @Date: 2024/06/07
 
 FROM ubuntu:22.04
 
@@ -11,7 +11,9 @@ RUN sed -i "s@http://.*.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /etc/a
 
 # 安装JDK等
 RUN apt-get update && \
-    apt-get install -y openjdk-8-jdk wget vim openssh-server net-tools mysql-server
+    apt-get install -y openjdk-8-jdk wget vim openssh-server net-tools
+
+ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64 
 
 # 配置SSH免密码登录
 RUN ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa && \
@@ -31,26 +33,40 @@ RUN tar -xzvf apache-zookeeper-3.9.2-bin.tar.gz && \
     mv apache-zookeeper-3.9.2-bin zookeeper && \
     chmod -R 777 zookeeper
 
-# 下载并解压 HBase
-RUN wget https://mirrors.tuna.tsinghua.edu.cn/apache/hbase/2.5.8/hbase-2.5.8-bin.tar.gz
-RUN tar -xzvf hbase-2.5.8-bin.tar.gz && \
-    rm hbase-2.5.8-bin.tar.gz && \
-    mv hbase-2.5.8 hbase && \
-    chmod -R 777 hbase
+# 下载并解压 Flink
+# RUN wget https://archive.apache.org/dist/flink/flink-1.14.6/flink-1.14.6-bin-scala_2.12.tgz
+COPY flink-1.14.6-bin-scala_2.12.tgz /root/
+RUN tar -xzvf flink-1.14.6-bin-scala_2.12.tgz && \
+    rm flink-1.14.6-bin-scala_2.12.tgz && \
+    mv flink-1.14.6 flink && \
+    chmod -R 777 flink
 
-# 下载并解压 Spark
-RUN wget https://mirrors.tuna.tsinghua.edu.cn/apache/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3-scala2.13.tgz
-RUN tar -xzvf spark-3.5.1-bin-hadoop3-scala2.13.tgz && \
-    rm spark-3.5.1-bin-hadoop3-scala2.13.tgz && \
-    mv spark-3.5.1-bin-hadoop3-scala2.13 spark && \
-    chmod -R 777 spark
-    
+
+# flink-shaded-hadoop-3-uber-3.1.1.7.2.9.0-173-9.0.jar
+# flink-shaded-zookeeper-3-3.8.3-18.0.jar
+RUN wget https://repository.cloudera.com/artifactory/cloudera-repos/org/apache/flink/flink-shaded-hadoop-3-uber/3.1.1.7.2.9.0-173-9.0/flink-shaded-hadoop-3-uber-3.1.1.7.2.9.0-173-9.0.jar
+RUN wget https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-zookeeper-3/3.8.3-18.0/flink-shaded-zookeeper-3-3.8.3-18.0.jar
+RUN mv flink-shaded-*.jar /root/flink/lib/
+# commons-cli-1.4.jar
+RUN wget https://repo1.maven.org/maven2/commons-cli/commons-cli/1.4/commons-cli-1.4.jar
+RUN mv commons-cli*.jar /root/flink/lib/
+COPY flink_config/ /root/tmpdir/
+
+# 下载并解压 Kafka
+# RUN wget https://mirrors.tuna.tsinghua.edu.cn/apache/kafka/3.7.0/kafka_2.12-3.7.0.tgz
+# RUN wget https://mirrors.aliyun.com/apache/kafka/3.7.0/kafka_2.12-3.7.0.tgz
+COPY kafka_2.12-3.7.0.tgz /root/
+RUN tar -xzvf kafka_2.12-3.7.0.tgz && \
+    rm kafka_2.12-3.7.0.tgz && \
+    mv kafka_2.12-3.7.0 kafka && \
+    chmod -R 777 kafka
+
+
+# Hadoop
 RUN echo "slave1" > /root/hadoop/etc/hadoop/workers
 RUN echo "slave2" >> /root/hadoop/etc/hadoop/workers
 RUN echo "slave3" >> /root/hadoop/etc/hadoop/workers
 
-# 配置环境变量
-ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64 
 ENV HADOOP_HOME=/root/hadoop
 
 RUN mkdir $HADOOP_HOME/tmp
@@ -60,6 +76,7 @@ RUN mkdir $HADOOP_HOME/namenode
 RUN mkdir $HADOOP_HOME/datanode
 
 ENV HADOOP_CONFIG_HOME=$HADOOP_HOME/etc/hadoop
+ENV HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
 
 ENV PATH=$JAVA_HOME/bin:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH
 
@@ -75,15 +92,13 @@ ENV YARN_NODEMANAGER_USER="root"
 ENV ZOOKEEPER_HOME=/root/zookeeper
 ENV PATH=$ZOOKEEPER_HOME/bin:$PATH
 
-# HBase
-ENV HBASE_HOME=/root/hbase
-ENV PATH=$HBASE_HOME/bin:$HBASE_HOME/sbin:$PATH
+# flink
+ENV FLINK_HOME=/root/flink
+ENV PATH=$FLINK_HOME/bin:$PATH
 
-# Spark
-ENV SPARK_HOME=/root/spark 
-ENV PATH=$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH 
-ENV HADOOP_CONF_DIR=/root/hadoop/etc/hadoop 
-ENV YARN_CONF_DIR=/root/hadoop/etc/hadoop 
+# kafka
+ENV KAFKA_HOME=/root/kafka
+ENV PATH=$KAFKA_HOME/bin:$PATH
 
 # 配置Hadoop
 COPY hadoop_config/* /root/hadoop/etc/hadoop/
@@ -94,21 +109,8 @@ RUN mkdir /root/zookeeper/tmp
 RUN cp /root/zookeeper/conf/zoo_sample.cfg /root/zookeeper/conf/zoo.cfg
 COPY zookeeper_config/* /root/zookeeper/conf/
 
-# 配置HBase
-COPY hbase_config/* /root/hbase/conf/
-RUN echo "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> /root/hbase/conf/hbase-env.sh
-RUN echo "export HBASE_MANAGES_ZK=false" >> /root/hbase/conf/hbase-env.sh
-RUN echo "export HBASE_LIBRARY_PATH=/root/hadoop/lib/native" >> /root/hbase/conf/hbase-env.sh
-RUN echo 'export HBASE_DISABLE_HADOOP_CLASSPATH_LOOKUP="true"' >> /root/hbase/conf/hbase-env.sh
-
-# 配置Spark
-RUN mv /root/spark/conf/spark-env.sh.template /root/spark/conf/spark-env.sh
-RUN echo "export SPARK_DIST_CLASSPATH=$(/root/hadoop/bin/hadoop classpath)" >> /root/spark/conf/spark-env.sh
-RUN mv /root/spark/conf/workers.template /root/spark/conf/workers
-RUN echo "master" > /root/spark/conf/workers
-RUN echo "slave1" >> /root/spark/conf/workers
-RUN echo "slave2" >> /root/spark/conf/workers
-RUN echo "slave3" >> /root/spark/conf/workers
+# 配置Kafka
+COPY kafka_config/* /root/kafka/config/
 
 # 配置SSH
 RUN echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config
@@ -116,11 +118,13 @@ RUN echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
 RUN echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
 RUN echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
 
-# 下载并解压 MySQL JDBC
-RUN wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-8.0.24.tar.gz
-RUN tar -xzvf mysql-connector-java-8.0.24.tar.gz && \
-    rm mysql-connector-java-8.0.24.tar.gz && \
-    mv mysql-connector-java-8.0.24/mysql-connector-java-8.0.24.jar /root/spark/jars/
+
+RUN echo "export HADOOP_CLASSPATH=`hadoop classpath`" >> /root/.bashrc
+
+# scripts
+COPY scripts/* /root/scripts/
+RUN chmod -R 777 /root/scripts
+ENV PATH=/root/scripts:$PATH
 
 # 启动SSH服务
-CMD ["bash", "-c", "service ssh restart; bash"]
+CMD ["bash", "-c", "bash"]
